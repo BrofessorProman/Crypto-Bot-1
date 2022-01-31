@@ -32,7 +32,7 @@ session.headers.update(headers)
 cmcidlookup.mapCMC(session)
 fetchQuotes(session)
 
-# todo - Not sure this is the correct path to take for parallel programing; need to do more research (consider multiprocessesing instead of multithreading)
+# todo - Use multiprocessing to accomplish this
 # def autoPostFNG():
 #   while True:
 #     fng_index = schedule.every().day.at("00:00").do(get_fgIndex)
@@ -80,27 +80,16 @@ async def on_message(message):
   elif message.content.startswith("!price"):
     requested_sym = cmcidlookup.getSymbolFromMessage(message.content)
     try:
-      # CMC_id = cmcidlookup.cmcIDLookUp(requested_sym, session)
-      # print("The CMC_id with full url: ", full_url + str(CMC_id))
+      # todo - ***pickup here***
       if requested_sym == "error":
         print("error")
         await message.channel.send("Check the spelling of the ticker you entered. If it is correct, try again later.")
       else:
-        # response = session.get(full_url + str(CMC_id))
-        # data = json.loads(response.text)
-        
-        # # Print the requested data into Discord
-        # crypto_name = data["data"][str(CMC_id)]["name"]
-        # formated_price = "${:.2f}".format(data["data"][str(CMC_id)]["quote"]["USD"]["price"])
-
         crypto_name, quote = getQuote(session, requested_sym)
 
         await message.channel.send(f"{crypto_name} Price: {quote}")
     except (ConnectionError, Timeout, TooManyRedirects) as e:
       print(e)
       await message.channel.send(f"Error: {e}")
-
-# fng_thread = threading.Thread(target=autoPostFNG)
-# fng_thread.start()
 
 client.run(os.environ['botToken'])

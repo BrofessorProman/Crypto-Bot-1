@@ -1,4 +1,4 @@
-import json, datetime, pickle
+import json, datetime, pickle, sqlite3
 
 # todo - need to determine if there are multiple of the same symbols and ask the user via reactions which one they want
 
@@ -13,46 +13,42 @@ def cmcIDLookUp(message, session):
     mapCMC(session)
     day = datetime.datetime.now(datetime.timezone.utc).day
 
-  map_dict = readCMCFile()
+  map_list = readCMCdb()
 
-  if isinstance(map_dict, dict):
-    return map_dict[message]["id"]
+  if len(map_list) > 4:
+    # todo - ask the user which crypto they wants as there are duplicates
   else:
-    return "error"
+    cmc_id = map_list[0]
+
+  return cmc_id
 
 
 # Take data from CMC and format it into a new dictionary (Format: {"crypto_ticker": {"id": cmc_id, "name": "crypto_name", "symbol": "crypto_ticker", "is_active": Bool}}), then pickle it to a file
 def cleanMap(map_data):
-  clean_dict = {}
-  sub_dict = {}
+  conn = sqlite3.connect("cmc_data.db")
+  cursor = conn.cursor()
+
+  cursor.execute("""CREATE TABLE IF NOT EXISTS
+      cmc_map(cmc_id INTEGER PRIMARY KEY, name TEXT, symbol TEXT, is_active INTEGER)""")
+
+# Grab the "id," "name," "symbol" and "is_active" values from the map_data dictionary
   for i in range(len(map_data)):
-    sub_dict["id"] = map_data[i]["id"]
-    sub_dict["name"] = map_data[i]["name"]
-    sub_dict["symbol"] = map_data[i]["symbol"]
-    if map_data[i]["is_active"] == 0:
-      sub_dict["is_active"] = False
-    else:
-      sub_dict["is_active"] = True
+    cmc_id = map_data[i]["id"]
+    cmc_name = map_data[i]["name"]
+    cmc_symbol = map_data[i]["symbol"]
+    cmc_is_active = map_data[i]["is_active"]
+    cursor.execute("""INSERT INTO cmc_datas VALUES (?, ?, ?, ?)""", (cmc_id, cmc_name, cmc_symbol, cmc_is_active))
 
-    # Must insert "sub_dict" using .copy() otherwise it will insert an empty dictionary
-    clean_dict[map_data[i]["symbol"]] = sub_dict.copy()
-    sub_dict.clear()
+  conn.commit()
+  conn.close()
 
-  with open("CMC_Clean_Map.txt", "wb") as file:
-    pickle.dump(clean_dict, file)
-
-# Take the users input and split it after the space to get the requested lookup symbol
+# Parse the ticker from the discord message
 def getSymbolFromMessage(message):
-  with open("CMC_Clean_Map.txt", "rb") as file:
-    cmc_map = pickle.load(file)
-
+  # todo - rework for sql
   split_list = message.split(" ", 1)
   symbol = split_list[1].upper()
 
-  if symbol in cmc_map:
-    return symbol
-  else:
-    return "error"
+  return symbol
 
 # Get a map of CMC and return a list of all the items
 def mapCMC(session):
@@ -65,8 +61,13 @@ def mapCMC(session):
   cleanMap(cmc_map_list)
 
 # Read from "CMC_Clean_Map.txt" return a dictionary
-def readCMCFile():
-  with open("CMC_Clean_Map.txt", "rb") as file:
-    map_data = pickle.load(file)
-  
+def readCMCdb(ticker):
+  conn = sqlite3.connect("cmc_data.db")
+  cursor = conn.cursor()
+
+  cursor.execute("""SELECT * FROM cmc_maps WHERE name = ?""", (ticker))
+
+  map_data = cursor.fetchall()
+  conn.close()
+
   return map_data
