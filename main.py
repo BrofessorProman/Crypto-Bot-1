@@ -3,6 +3,7 @@ from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 from cmcpricelookup import getQuote, fetchQuotes
 # import schedule, threading
+from os.path import isfile
 
 client = discord.Client()
 CMC_KEY = os.environ['CMC_API_KEY']
@@ -29,7 +30,10 @@ session = Session()
 session.headers.update(headers)
 
 # Map CMC on startup and get a fresh copy of quotes
-cmcidlookup.mapCMC(session)
+if not isfile("cmc_data.db"):
+  cmcidlookup.mapCMC(session)
+else:
+  cmcidlookup.updateMapdb(session)
 fetchQuotes(session)
 
 # todo - Use multiprocessing to accomplish this
@@ -80,7 +84,6 @@ async def on_message(message):
   elif message.content.startswith("!price"):
     requested_sym = cmcidlookup.getSymbolFromMessage(message.content)
     try:
-      # todo - ***pickup here***
       if requested_sym == "error":
         print("error")
         await message.channel.send("Check the spelling of the ticker you entered. If it is correct, try again later.")
