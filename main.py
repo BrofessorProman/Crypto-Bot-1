@@ -1,7 +1,7 @@
 import os, discord, json, cmcidlookup
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
-from cmcpricelookup import getQuote, fetchQuotes
+from cmcpricelookup import getQuote, updateQuotes, writeQuotes
 # import schedule, threading
 from os.path import isfile
 
@@ -29,12 +29,16 @@ headers = {
 session = Session()
 session.headers.update(headers)
 
-# Map CMC on startup and get a fresh copy of quotes
+# Map CMC on startup and get a fresh copy of quotes; check to see if the database and the tables exist
 if not isfile("cmc_data.db"):
   cmcidlookup.mapCMC(session)
+  writeQuotes(session)
 else:
   cmcidlookup.updateMapdb(session)
-fetchQuotes(session)
+  updateQuotes(session)
+
+# cmcidlookup.updateMapdb(session)
+# writeQuotes(session)
 
 # todo - Use multiprocessing to accomplish this
 # def autoPostFNG():

@@ -1,9 +1,10 @@
-import time, json, pickle
+import time, json, sqlite3
 from cmcidlookup import cmcIDLookUp
 
 time_sec = time.time()
 
-# todo - Go out and grab all the prices of all the crypto and store in a file if the data is 60 seconds old to reduce API calls, otherwise read from file to lookup the crypto price
+# todo - write a function that connects to the database and returns a cursor object
+
 def fetchQuotes(session):
   # Use this url to request ALL crypto quote data
   CMC_QUOTES_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest"
@@ -12,7 +13,7 @@ def fetchQuotes(session):
   quotes_dict = json.loads(quotes_data.text)
 
   printCredits(quotes_dict)
-  writeQuotes(quotes_dict)
+  return quotes_dict
 
 # Print the current credit count to the console after ever API request
 def printCredits(quotes_dict):
@@ -24,61 +25,73 @@ def printCredits(quotes_dict):
   print(f"Credits remaining: {str(credits_remaining)}")
 
 # todo - dispatch this function on another thread so the user doesn't have to wait for this to finish
+# Dump all the quote data returned from CMC into a database table
+def writeQuotes(session):
+    quotes_dict = fetchQuotes(session)
+    conn = sqlite3.connect("cmc_data.db")
+    cursor = conn.cursor()
 
-# Format the dictionary (Format: {"cypto_ticker": {"id": CMC_id, "name": "crypto_name", "symbol": "crypto_ticker", "max_supply": supply_num, "circulating_supply": circ_supply_num, "total_supply": total_suppply_num, "cmc_rank": rank_num, "quote": quote_num, "volume_24h": volume_num, "volume_change_24h": vol_chang_num, "percent_change_1h": float, "percent_change_24h": float, "percent_change_7d": float, "percent_change_30d": float, "percent_change_60d": float, "percent_change_90d": float, "market_cap": market_cap_num, "market_cap_dominance": cap_dom_num, "fully_diluted_market_cap": dil_cap_num}}) and write it to a file
-def writeQuotes(quotes_dict):
-  sub_dict = {}
-  crypto_data = {}
+  # Create a new table in cmc_data.db called cmc_quotes to dump all the crypto data returned from CMC into
+    cursor.execute("""CREATE TABLE IF NOT EXISTS cmc_quotes 
+        (cmc_id INTEGER,
+        name TEXT,
+        ticker TEXT,
+        max_supply INTEGER,
+        circulating_supply INTEGER,
+        total_supply INTEGER,
+        rank INTEGER,
+        quote REAL,
+        volume_24h INTEGER,
+        volume_change_24h INTEGER,
+        percent_change_1h REAL,
+        percent_change_24h REAL,
+        percent_change_7d REAL,
+        percent_change_30d REAL,
+        percent_change_60d REAL,
+        percent_change_90d REAL,
+        market_cap REAL,
+        market_cap_dominance REAL,
+        fully_diluted_market_cap REAL, FOREIGN KEY(cmc_id) REFERENCES cmc_map(cmc_id))""")
 
-  for i in range(len(quotes_dict["data"])):
-    sub_dict["id"] = quotes_dict["data"][i]["id"]
-    sub_dict["name"] = quotes_dict["data"][i]["name"]
-    sub_dict["symbol"] = quotes_dict["data"][i]["symbol"]
-    sub_dict["max_supply"] = quotes_dict["data"][i]["max_supply"]
-    sub_dict["circulating_supply"] = quotes_dict["data"][i]["circulating_supply"]
-    sub_dict["total_supply"] = quotes_dict["data"][i]["total_supply"]
-    sub_dict["cmc_rank"] = quotes_dict["data"][i]["cmc_rank"]
-    sub_dict["quote"] = quotes_dict["data"][i]["quote"]["USD"]["price"]
-    sub_dict["volume_24h"] = quotes_dict["data"][i]["quote"]["USD"]["volume_24h"]
-    sub_dict["volume_change_24h"] = quotes_dict["data"][i]["quote"]["USD"]["volume_change_24h"]
-    sub_dict["percent_change_1h"] = quotes_dict["data"][i]["quote"]["USD"]["percent_change_1h"]
-    sub_dict["percent_change_24h"] = quotes_dict["data"][i]["quote"]["USD"]["percent_change_24h"]
-    sub_dict["percent_change_7d"] = quotes_dict["data"][i]["quote"]["USD"]["percent_change_7d"]
-    sub_dict["percent_change_30d"] = quotes_dict["data"][i]["quote"]["USD"]["percent_change_30d"]
-    sub_dict["percent_change_60d"] = quotes_dict["data"][i]["quote"]["USD"]["percent_change_60d"]
-    sub_dict["percent_change_90d"] = quotes_dict["data"][i]["quote"]["USD"]["percent_change_90d"]
-    sub_dict["market_cap"] = quotes_dict["data"][i]["quote"]["USD"]["market_cap"]
-    sub_dict["market_cap_dominance"] = quotes_dict["data"][i]["quote"]["USD"]["market_cap_dominance"]
-    sub_dict["fully_diluted_market_cap"] = quotes_dict["data"][i]["quote"]["USD"]["fully_diluted_market_cap"]
+    for i in range(len(quotes_dict["data"])):
+        quote_tuple = parseQuoteData(quotes_dict, i)
 
-    crypto_data[quotes_dict["data"][i]["symbol"]] = sub_dict.copy()
-    sub_dict.clear()
-
-  with open("CMC_Quotes.txt", "wb") as file:
-    pickle.dump(crypto_data, file)
+        cursor.execute("INSERT INTO cmc_quotes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   quote_tuple)
+        conn.commit()
+    conn.close()
 
 # Get the user requested quote either from file or fetch a new copy
-# todo - write a try/exect error to catch exception "KeyError"
 def getQuote(session, ticker):
-  global time_sec
+    global time_sec
 
-  if time.time() > (time_sec + 60):
-    print("Fetching quotes...")
-    fetchQuotes(session)
-    time_sec = time.time()
+    if time.time() > (time_sec + 60):
+        print("Fetching quotes...")
+        fetchQuotes(session)
+        time_sec = time.time()
 
-  with open("CMC_Quotes.txt", "rb") as file:
-    quotes = pickle.load(file)
-  
-  try:
-    price = formatQuote(quotes[ticker]["quote"])
-    crypto_name = quotes[ticker]["name"]
-  except KeyError as e:
-    print(f"Can not find {ticker} in file. Error: {e}")
     cmc_id = cmcIDLookUp(ticker, session)
-    crypto_name, price = getIndividualQuote(cmc_id, session)
-    
-  return crypto_name, price
+
+    conn = sqlite3.connect("cmc_data.db")
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM cmc_quotes WHERE cmc_id = ?", (cmc_id[0],))
+
+    # Probably a better way to do this, but too lazy to figure it out right now; just let getIndividualQuote do
+    # the heavy lifting
+    try:
+        db_list = cursor.fetchall()[0]
+        # Full name of crypto
+        crypto_name = db_list[1]
+        # Quote
+        price = formatQuote(db_list[7])
+    except IndexError as e:
+        print(f"Error: {e}")
+        crypto_name, price  = getIndividualQuote(cmc_id[0], session)
+
+    conn.close()
+
+    return crypto_name, price
 
 # Format the price so that it reads out to the nearest penny if the price is > $1 otherwise print the entire price
 def formatQuote(quote):
@@ -89,7 +102,8 @@ def formatQuote(quote):
 
   return price
 
-# If getQuotes() can't find the price, lookup the CMC id and grab that specific data; it seems like CMC doesn't return ALL quotes for ALL crypto
+# If getQuotes() can't find the price, lookup the CMC id and grab that specific data; it seems like CMC doesn't
+# return ALL quotes for ALL crypto
 def getIndividualQuote(cmc_id, session):
   CMC_url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?&id="
 
@@ -100,3 +114,55 @@ def getIndividualQuote(cmc_id, session):
   formated_price = formatQuote(data["data"][str(cmc_id)]["quote"]["USD"]["price"])
 
   return crypto_name, formated_price
+
+def updateQuotes(session):
+    quotes_dict = fetchQuotes(session)
+
+    conn = sqlite3.connect("cmc_data.db")
+    cursor = conn.cursor()
+    for i in range(len(quotes_dict["data"])):
+        quote_tuple = parseQuoteData(quotes_dict, i)
+        cursor.execute("""UPDATE cmc_quotes SET 
+          name = ?,
+          ticker = ?,
+          max_supply = ?,
+          circulating_supply = ?,
+          total_supply = ?,
+          rank = ?,
+          quote = ?,
+          volume_24h = ?,
+          volume_change_24h = ?,
+          percent_change_1h = ?,
+          percent_change_24h = ?,
+          percent_change_7d = ?,
+          percent_change_30d = ?,
+          percent_change_60d = ?,
+          percent_change_90d = ?,
+          market_cap = ?,
+          market_cap_dominance = ?,
+          fully_diluted_market_cap = ?
+          WHERE cmc_id = ?""", quote_tuple)
+        conn.commit()
+    conn.close()
+
+def parseQuoteData(quotes_dict, index):
+    list_to_tuple = [quotes_dict["data"][index]["id"],
+                     quotes_dict["data"][index]["name"],
+                     quotes_dict["data"][index]["symbol"],
+                     quotes_dict["data"][index]["max_supply"],
+                     quotes_dict["data"][index]["circulating_supply"],
+                     quotes_dict["data"][index]["total_supply"],
+                     quotes_dict["data"][index]["cmc_rank"],
+                     quotes_dict["data"][index]["quote"]["USD"]["price"],
+                     quotes_dict["data"][index]["quote"]["USD"]["volume_24h"],
+                     quotes_dict["data"][index]["quote"]["USD"]["volume_change_24h"],
+                     quotes_dict["data"][index]["quote"]["USD"]["percent_change_1h"],
+                     quotes_dict["data"][index]["quote"]["USD"]["percent_change_24h"],
+                     quotes_dict["data"][index]["quote"]["USD"]["percent_change_7d"],
+                     quotes_dict["data"][index]["quote"]["USD"]["percent_change_30d"],
+                     quotes_dict["data"][index]["quote"]["USD"]["percent_change_60d"],
+                     quotes_dict["data"][index]["quote"]["USD"]["percent_change_90d"],
+                     quotes_dict["data"][index]["quote"]["USD"]["market_cap"],
+                     quotes_dict["data"][index]["quote"]["USD"]["market_cap_dominance"],
+                     quotes_dict["data"][index]["quote"]["USD"]["fully_diluted_market_cap"]]
+    return tuple(list_to_tuple)
