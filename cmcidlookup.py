@@ -1,14 +1,10 @@
+import asyncio
 import json, datetime, sqlite3
-
-# todo - need to determine if there are multiple of the same symbols and ask the user via reactions which one they want
-
-# Create a cursor object and connect to the cmc_data.db
-def cmcDatabseConnection():
-  pass
+from cogs.discordreactions import askUserSymbol
 
 # Search through the database to see if the users request exists; return "error" if it was bad input or symbol
 # doesn't exist
-def cmcIDLookUp(message, session):
+def cmcIDLookUp(message, session, cl_ctx):
   # Check to see when the list was last updated in the last day; if not fetch an updated map
   global day
   # Initialize a date object to represent the current day
@@ -23,19 +19,13 @@ def cmcIDLookUp(message, session):
   # Check to see if the list has more than 1 item; more than 1 items means there are duplicate crypto
   # using the same ticker (SQL database will return a list of tuples if is more than one  crypto with the same ticker)
   if len(map_list) > 1:
-    # todo - see below
-    """ 
-    Ask the user which crypto they wants as there are duplicates (ensure cmc_id is assigned so it can be
-    returned)
-    """
-    print("Need to finish writing a function to ask the user which crypto they intended to lookup if there"
-          "are multiple.")
-    pass
+    print(f"In cmcIOLookUp - map_list: {map_list}")
+    # Ask the user which crypto they had intended to lookup (cl_ctx[0] = client & cl_ctx[1] = context)
+    asyncio.run_coroutine_threadsafe(askUserSymbol(cl_ctx[1], map_list), cl_ctx[0].loop)
+    return
   else:
     cmc_id = map_list[0]
-
-  return cmc_id
-
+    return cmc_id
 
 # Take data from CMC and dump into a database table
 def mapCMC(session):
@@ -46,7 +36,7 @@ def mapCMC(session):
   cursor.execute("""CREATE TABLE IF NOT EXISTS
       cmc_map(cmc_id INTEGER PRIMARY KEY, name TEXT, symbol TEXT, is_active INTEGER)""")
 
-# Input the "id," "name," "symbol" and "is_active" values from the map_data dictionary into the cmc_map table
+  # Input the "id," "name," "symbol" and "is_active" values from the map_data dictionary into the cmc_map table
   for i in range(len(cmc_map_list)):
     cmc_id = cmc_map_list[i]["id"]
     cmc_name = cmc_map_list[i]["name"]
@@ -59,8 +49,7 @@ def mapCMC(session):
 
 # Parse the ticker from the discord message and check to see if the ticker exists in the database
 def getSymbolFromMessage(message):
-  split_list = message.split(" ", 1)
-  symbol = split_list[1].upper()
+  symbol = message.upper()
 
   conn = sqlite3.connect("cmc_data.db")
   cursor = conn.cursor()

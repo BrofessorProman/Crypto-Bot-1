@@ -3,8 +3,6 @@ from cmcidlookup import cmcIDLookUp
 
 time_sec = time.time()
 
-# todo - write a function that connects to the database and returns a cursor object
-
 def fetchQuotes(session):
   # Use this url to request ALL crypto quote data
   CMC_QUOTES_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest"
@@ -62,7 +60,7 @@ def writeQuotes(session):
     conn.close()
 
 # Get the user requested quote either from file or fetch a new copy
-def getQuote(session, ticker):
+def getQuote(session, ticker, cl_ctx):
     global time_sec
 
     if time.time() > (time_sec + 60):
@@ -70,7 +68,11 @@ def getQuote(session, ticker):
         fetchQuotes(session)
         time_sec = time.time()
 
-    cmc_id = cmcIDLookUp(ticker, session)
+    cmc_id = cmcIDLookUp(ticker, session, cl_ctx)
+
+    # Check to see if there was anything returned
+    if cmc_id is None:
+        return
 
     conn = sqlite3.connect("cmc_data.db")
     cursor = conn.cursor()
@@ -87,7 +89,7 @@ def getQuote(session, ticker):
         price = formatQuote(db_list[7])
     except IndexError as e:
         print(f"Error: {e}")
-        crypto_name, price  = getIndividualQuote(cmc_id[0], session)
+        crypto_name, price = getIndividualQuote(cmc_id[0], session)
 
     conn.close()
 
