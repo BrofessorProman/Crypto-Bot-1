@@ -1,13 +1,12 @@
-import os, discord, json, cmcidlookup
+import os, json, cmcidlookup, cmcpricelookup
 from requests import Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
-from cmcpricelookup import getQuote, updateQuotes, writeQuotes
 # import schedule, threading
 from os.path import isfile
 from discord.ext import commands
+import config
 
-# client = discord.Client()
-CMC_KEY = os.environ['CMC_API_KEY']
+config.init()
 
 bot = commands.Bot(command_prefix="!")
 
@@ -20,26 +19,13 @@ payload = {
 
 fng_url = "https://api.alternative.me/fng/?limit=10&format=json&date_format=us"
 
-# CMC header parameter to open the connection
-headers = {
-  'Accepts': 'application/json',
-  'X-CMC_PRO_API_KEY': CMC_KEY,
-}
-
-# Create a new session to connect to CMC (Coin Market Cap)
-session = Session()
-session.headers.update(headers)
-
 # Map CMC on startup and get a fresh copy of quotes; check to see if the database and the tables exist
 if not isfile("cmc_data.db"):
-  cmcidlookup.mapCMC(session)
-  writeQuotes(session)
+  cmcidlookup.mapCMC(config.session)
+  cmcpricelookup.writeQuotes(config.session)
 else:
-  cmcidlookup.updateMapdb(session)
-  updateQuotes(session)
-
-# cmcidlookup.updateMapdb(session)
-# writeQuotes(session)
+  cmcidlookup.updateMapdb(config.session)
+  cmcpricelookup.updateQuotes(config.session)
 
 # todo - Use multiprocessing to accomplish this
 # def autoPostFNG():
@@ -95,7 +81,7 @@ async def price(ctx, arg):
       # Client and context (ctx) tuple
       cl_ctx = (bot, ctx)
       try:
-        crypto_name, quote = getQuote(session, requested_sym, cl_ctx)
+        crypto_name, quote = cmcpricelookup.getQuote(config.session, requested_sym, cl_ctx)
         await ctx.send(f"{crypto_name} Price: {quote}")
       except TypeError as e:
         print(f"Error: {e}")

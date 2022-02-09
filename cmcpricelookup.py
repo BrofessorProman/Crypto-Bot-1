@@ -1,5 +1,4 @@
-import time, json, sqlite3
-from cmcidlookup import cmcIDLookUp
+import time, json, sqlite3, cmcidlookup
 
 time_sec = time.time()
 
@@ -25,6 +24,8 @@ def printCredits(quotes_dict):
 # todo - dispatch this function on another thread so the user doesn't have to wait for this to finish
 # Dump all the quote data returned from CMC into a database table
 def writeQuotes(session):
+    print("Building CMC Quotes table...")
+
     quotes_dict = fetchQuotes(session)
     conn = sqlite3.connect("cmc_data.db")
     cursor = conn.cursor()
@@ -68,7 +69,7 @@ def getQuote(session, ticker, cl_ctx):
         fetchQuotes(session)
         time_sec = time.time()
 
-    cmc_id = cmcIDLookUp(ticker, session, cl_ctx)
+    cmc_id = cmcidlookup.cmcIDLookUp(ticker, session, cl_ctx)
 
     # Check to see if there was anything returned
     if cmc_id is None:
@@ -118,6 +119,8 @@ def getIndividualQuote(cmc_id, session):
   return crypto_name, formated_price
 
 def updateQuotes(session):
+    print("Updating CMC Quotes table...")
+
     quotes_dict = fetchQuotes(session)
 
     conn = sqlite3.connect("cmc_data.db")
@@ -147,9 +150,15 @@ def updateQuotes(session):
         conn.commit()
     conn.close()
 
+# todo - fix this as it will currently only work for updating the table
 def parseQuoteData(quotes_dict, index):
-    list_to_tuple = [quotes_dict["data"][index]["id"],
-                     quotes_dict["data"][index]["name"],
+    conn = sqlite3.connect("cmc_data.db")
+    cursor = conn.cursor()
+
+    # Check to see if the table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = 'cmc_butts'")
+
+    list_to_tuple = [quotes_dict["data"][index]["name"],
                      quotes_dict["data"][index]["symbol"],
                      quotes_dict["data"][index]["max_supply"],
                      quotes_dict["data"][index]["circulating_supply"],
@@ -167,4 +176,12 @@ def parseQuoteData(quotes_dict, index):
                      quotes_dict["data"][index]["quote"]["USD"]["market_cap"],
                      quotes_dict["data"][index]["quote"]["USD"]["market_cap_dominance"],
                      quotes_dict["data"][index]["quote"]["USD"]["fully_diluted_market_cap"]]
+
+    if len(cursor.fetchall()) == 0:
+        list_to_tuple.insert(0, quotes_dict["data"][index]["id"])
+    else:
+        list_to_tuple.append(quotes_dict["data"][index]["id"])
+
+    conn.close()
+
     return tuple(list_to_tuple)

@@ -1,6 +1,14 @@
 import asyncio
 import json, datetime, sqlite3
-from cogs.discordreactions import askUserSymbol
+import cogs.discordreactions
+
+# Connects to cmc_data.db and returns a cursor object
+# todo - need to figure out a way to close connection
+# def createCursor():
+#   conn = sqlite3.connect("cmc_data.db")
+#   cursor = conn.cursor()
+#
+#   return cursor
 
 # Search through the database to see if the users request exists; return "error" if it was bad input or symbol
 # doesn't exist
@@ -19,9 +27,8 @@ def cmcIDLookUp(message, session, cl_ctx):
   # Check to see if the list has more than 1 item; more than 1 items means there are duplicate crypto
   # using the same ticker (SQL database will return a list of tuples if is more than one  crypto with the same ticker)
   if len(map_list) > 1:
-    print(f"In cmcIOLookUp - map_list: {map_list}")
     # Ask the user which crypto they had intended to lookup (cl_ctx[0] = client & cl_ctx[1] = context)
-    asyncio.run_coroutine_threadsafe(askUserSymbol(cl_ctx[1], map_list), cl_ctx[0].loop)
+    asyncio.run_coroutine_threadsafe(cogs.discordreactions.askUserSymbol(cl_ctx[1], map_list), cl_ctx[0].loop)
     return
   else:
     cmc_id = map_list[0]
@@ -32,6 +39,8 @@ def mapCMC(session):
   cmc_map_list = fetchCMCMap(session)
   conn = sqlite3.connect("cmc_data.db")
   cursor = conn.cursor()
+
+  print("Building CMC Map table...")
 
   cursor.execute("""CREATE TABLE IF NOT EXISTS
       cmc_map(cmc_id INTEGER PRIMARY KEY, name TEXT, symbol TEXT, is_active INTEGER)""")
@@ -87,6 +96,8 @@ def readCMCdb(ticker):
 
 # Update the cmc_map table in the cmc_data.db
 def updateMapdb(session):
+  print("Updating CMC Map table...")
+
   cmc_map_list = fetchCMCMap(session)
 
   conn = sqlite3.connect("cmc_data.db")
