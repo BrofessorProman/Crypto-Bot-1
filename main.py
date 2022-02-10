@@ -11,16 +11,16 @@ config.init()
 bot = commands.Bot(command_prefix="!")
 
 # CMC payload (can't seem to get this payload to work)
-payload = {
-  "id": 1,
-  "slug": "bitcoin",
-  "symbol": "BTC"
-}
+# payload = {
+#   "id": 1,
+#   "slug": "bitcoin",
+#   "symbol": "BTC"
+# }
 
 fng_url = "https://api.alternative.me/fng/?limit=10&format=json&date_format=us"
 
 # Map CMC on startup and get a fresh copy of quotes; check to see if the database and the tables exist
-if not isfile("cmc_data.db"):
+if not isfile(os.getcwd() + "\cmc_data.db"):
   cmcidlookup.mapCMC(config.session)
   cmcpricelookup.writeQuotes(config.session)
 else:
@@ -50,6 +50,7 @@ def get_fgIndex():
 async def on_ready():
   print('We have logged in as {0.user}'.format(bot))
 
+# Command for getting the current fear and greed index and print it out
 @bot.command()
 async def fng(ctx):
   fng_json = get_fgIndex()
@@ -61,6 +62,7 @@ async def fng(ctx):
   else:
     await ctx.send("Bad request")
 
+# Command for getting yesterday's fear and greed index and print it out
 @bot.command()
 async def yfng(ctx):
   fng_json = get_fgIndex()
@@ -70,9 +72,13 @@ async def yfng(ctx):
   else:
     await ctx.send("Bad request")
 
+# todo -  move the printing to a function as cogs.discordreations.on_raw_reaction_add uses the same print statement
+# Command to look up a crypto price based on a ticker
 @bot.command()
 async def price(ctx, arg):
   requested_sym = cmcidlookup.getSymbolFromMessage(arg)
+
+  # Try to get the requested crypto quote
   try:
     if requested_sym == "error":
       print("error")
@@ -80,6 +86,8 @@ async def price(ctx, arg):
     else:
       # Client and context (ctx) tuple
       cl_ctx = (bot, ctx)
+
+      # Try statement for when multiple crypto share the same ticker; nothing is retuned in this case
       try:
         crypto_name, quote = cmcpricelookup.getQuote(config.session, requested_sym, cl_ctx)
         await ctx.send(f"{crypto_name} Price: {quote}")

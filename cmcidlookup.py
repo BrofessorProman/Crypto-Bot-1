@@ -2,14 +2,6 @@ import asyncio
 import json, datetime, sqlite3
 import cogs.discordreactions
 
-# Connects to cmc_data.db and returns a cursor object
-# todo - need to figure out a way to close connection
-# def createCursor():
-#   conn = sqlite3.connect("cmc_data.db")
-#   cursor = conn.cursor()
-#
-#   return cursor
-
 # Search through the database to see if the users request exists; return "error" if it was bad input or symbol
 # doesn't exist
 def cmcIDLookUp(message, session, cl_ctx):
@@ -34,7 +26,7 @@ def cmcIDLookUp(message, session, cl_ctx):
     cmc_id = map_list[0]
     return cmc_id
 
-# Take data from CMC and dump into a database table
+# Take data from CMC and dump into a database table; map all crypto from Coin Market Cap
 def mapCMC(session):
   cmc_map_list = fetchCMCMap(session)
   conn = sqlite3.connect("cmc_data.db")
@@ -73,7 +65,7 @@ def getSymbolFromMessage(message):
     conn.close()
     return symbol
 
-# Get a map of CMC and return a list of all the items
+# Fetch a map of CMC and return a list of all the items
 def fetchCMCMap(session):
   url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/map"
   cmc_map = session.get(url)

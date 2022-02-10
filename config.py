@@ -1,6 +1,8 @@
 from requests import Session
 import os
 
+# Initialize all variables that need to hold persistent data across files/instances
+
 CMC_KEY = os.environ['CMC_API_KEY']
 
 # CMC header parameter to open the connection

@@ -1,7 +1,9 @@
 import time, json, sqlite3, cmcidlookup
 
+# Initialize a time object to be used for updating the quotes table
 time_sec = time.time()
 
+# Fetch the top 100 crypto quotes from Coin Market Cap
 def fetchQuotes(session):
   # Use this url to request ALL crypto quote data
   CMC_QUOTES_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest"
@@ -22,7 +24,7 @@ def printCredits(quotes_dict):
   print(f"Credits remaining: {str(credits_remaining)}")
 
 # todo - dispatch this function on another thread so the user doesn't have to wait for this to finish
-# Dump all the quote data returned from CMC into a database table
+# Create and dump all the quote data returned from CMC into a database table
 def writeQuotes(session):
     print("Building CMC Quotes table...")
 
@@ -60,7 +62,7 @@ def writeQuotes(session):
         conn.commit()
     conn.close()
 
-# Get the user requested quote either from file or fetch a new copy
+# Get the user requested quote either from the database or fetch new data if it's 60 seconds or older
 def getQuote(session, ticker, cl_ctx):
     global time_sec
 
@@ -80,8 +82,7 @@ def getQuote(session, ticker, cl_ctx):
 
     cursor.execute("SELECT * FROM cmc_quotes WHERE cmc_id = ?", (cmc_id[0],))
 
-    # Probably a better way to do this, but too lazy to figure it out right now; just let getIndividualQuote do
-    # the heavy lifting
+    # If the crypto requested by the user isn't in the database, fetch quote data just for the crytpo
     try:
         db_list = cursor.fetchall()[0]
         # Full name of crypto
@@ -96,7 +97,7 @@ def getQuote(session, ticker, cl_ctx):
 
     return crypto_name, price
 
-# Format the price so that it reads out to the nearest penny if the price is > $1 otherwise print the entire price
+# Format the price so that it reads out to the nearest penny if the price is > $1 otherwise format to 8 decimal places
 def formatQuote(quote):
   if quote >= 1:
     price = "${:.2f}".format(quote)
@@ -105,8 +106,7 @@ def formatQuote(quote):
 
   return price
 
-# If getQuotes() can't find the price, lookup the CMC id and grab that specific data; it seems like CMC doesn't
-# return ALL quotes for ALL crypto
+# If getQuotes() can't find the price, lookup the CMC id and grab that specific data
 def getIndividualQuote(cmc_id, session):
   CMC_url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?&id="
 
@@ -118,6 +118,7 @@ def getIndividualQuote(cmc_id, session):
 
   return crypto_name, formated_price
 
+# Udate the quote table in the database
 def updateQuotes(session):
     print("Updating CMC Quotes table...")
 
@@ -150,13 +151,13 @@ def updateQuotes(session):
         conn.commit()
     conn.close()
 
-# todo - fix this as it will currently only work for updating the table
+# Moved this to it's own function as both updateQuotes and writeQuotes use similar formats
 def parseQuoteData(quotes_dict, index):
     conn = sqlite3.connect("cmc_data.db")
     cursor = conn.cursor()
 
     # Check to see if the table exists
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = 'cmc_butts'")
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = 'cmc_quotes'")
 
     list_to_tuple = [quotes_dict["data"][index]["name"],
                      quotes_dict["data"][index]["symbol"],
@@ -177,6 +178,7 @@ def parseQuoteData(quotes_dict, index):
                      quotes_dict["data"][index]["quote"]["USD"]["market_cap_dominance"],
                      quotes_dict["data"][index]["quote"]["USD"]["fully_diluted_market_cap"]]
 
+    # If the table doesn't exist, add the cmc_id to the beginning of the list, else add it to the end when updating
     if len(cursor.fetchall()) == 0:
         list_to_tuple.insert(0, quotes_dict["data"][index]["id"])
     else:
