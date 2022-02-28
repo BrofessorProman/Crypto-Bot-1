@@ -1,24 +1,28 @@
 from discord.ext import commands
 import config
 import cmcpricelookup
-# todo - add comments
 
 # List of available emoji to print for a response from the user
 emoji_list = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
 
 class Reactions(commands.Cog):
-    def __init__(self, client):
-        self.client = client
+    """
+    This class reacts to users input on their desired crypto selection if more than one crypto exists with the same
+    ticker
+    """
+
+    def __init__(self, bot):
+        self.bot = bot
 
     # Called when the user clicks an emoji posted by the bot
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, reaction):
         # Ensure the bot doesn't react to itself
-        if reaction.user_id != self.client.user.id:
+        if reaction.user_id != self.bot.user.id:
             # Cycle through the emoji posted by the bot to see which one the user interacted with
             for emoji in config.emoji_list_temp:
                 if str(reaction.emoji) == emoji:
-                    channel = self.client.get_channel(reaction.channel_id)
+                    channel = self.bot.get_channel(reaction.channel_id)
                     message = await channel.fetch_message(reaction.message_id)
                     await message.delete()
                     crypto_name, quote = cmcpricelookup.getIndividualQuote(config.crypto_list_temp
@@ -49,5 +53,5 @@ async def askUserSymbol(context, crypto_list):
         config.emoji_list_temp.append(emoji_list[x])
         x += 1
 
-def setup(client):
-    client.add_cog(Reactions(client))
+def setup(bot):
+    bot.add_cog(Reactions(bot))

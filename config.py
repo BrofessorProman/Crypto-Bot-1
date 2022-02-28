@@ -24,3 +24,7 @@ def init():
     global session
     session = Session()
     session.headers.update(headers)
+
+    # Store the context in which the user wants to post scheduled messages to
+    global sched_post_chan_ids
+    sched_post_chan_ids = []
