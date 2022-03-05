@@ -68,7 +68,7 @@ def getQuote(session, ticker, cl_ctx):
 
     if time.time() > (time_sec + 60):
         print("Fetching quotes...")
-        fetchQuotes(session)
+        updateQuotes(session)
         time_sec = time.time()
 
     cmc_id = cmcidlookup.cmcIDLookUp(ticker, session, cl_ctx)

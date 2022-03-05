@@ -30,36 +30,6 @@ def main():
   async def on_ready():
       print(f"We have logged in as {bot.user}")
 
-  # todo -  move the printing to a function as cogs.discordreations.on_raw_reaction_add uses the same print statement
-  # Command to look up a crypto price based on a ticker
-  @bot.command()
-  async def price(ctx, arg):
-      requested_sym = cmcidlookup.getSymbolFromMessage(arg)
-
-      # Try to get the requested crypto quote
-      try:
-          if requested_sym == "error":
-              print("error")
-              await ctx.send("Check the spelling of the ticker you entered. If it is correct, try again later.")
-          else:
-              # Client and context (ctx) tuple
-              cl_ctx = (bot, ctx)
-
-              # Try statement for when multiple crypto share the same ticker; nothing is retuned in this case
-              try:
-                  crypto_name, quote = cmcpricelookup.getQuote(config.session, requested_sym, cl_ctx)
-                  await ctx.send(f"{crypto_name} Price: {quote}")
-              except TypeError as e:
-                  print(f"Error: {e}")
-
-      except (ConnectionError, Timeout, TooManyRedirects) as e:
-          print(e)
-          await ctx.send(f"Error: {e}")
-
-  # @bot.command()
-  # async def help(ctx):
-  #   await ctx.send("W.I.P.")
-
   # Load bot extensions into a list
   extensions = []
 

@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 import config
 from cogs.fearandgreedindex import FngIndex
 
-class Scheduledposts(commands.Cog):
+class Scheduledposts(commands.Cog, name="Scheduled Posts"):
 	"""
-	This class is for turning on, off and posting scheduled posts such as the Fear and Greed index found in main.main()
+	Turn scheduled posts on or off. Current scheduled posts available: Fear and Greed Index.
 	"""
 
 	def __init__(self, bot):
@@ -17,6 +17,7 @@ class Scheduledposts(commands.Cog):
 
 	# Loop every 15 minutes to check if the time is 12:00 A.M. - 12:29 A.M. in which time the updated fear and greed
 	# index will be available. Then post the fear and greed index to the channels that have scheduled_posts turned on.
+	# todo - fix (troubleshoot around 6 p.m. CST)
 	@tasks.loop(minutes=15)
 	async def printer(self):
 		utc_time = datetime.now(timezone.utc)
@@ -33,27 +34,27 @@ class Scheduledposts(commands.Cog):
 				for channel in config.sched_post_chan_ids:
 					await channel.send("Bad request")
 
-	# All the user to turn scheduled posts on or off for channels
+	# Allow the user to turn scheduled posts on or off for channels
 	@commands.command()
 	async def scheduled_posts(self, ctx: commands.Context):
+		"""
+		Turn scheduled posts on/off.
+		"""
 		message = await ctx.send("Would you like to turn scheduled posts ON or OFF for this channel?"
 		                         + "\n" + "Type -ON for on and -OFF for off.")
 
 		response_msg = await self.bot.wait_for("message")
 
-		if response_msg.content == "-YES":
-			print("They match!")
-
 		if response_msg.content.upper() == "-ON" and response_msg.channel == message.channel:
 			config.sched_post_chan_ids.append(response_msg.channel)
 			await message.delete()
 			await response_msg.delete()
-			await ctx.send("Scheduled messages have been turned on for this channel!")
+			await ctx.send("Scheduled posts have been turned on for this channel!")
 		elif response_msg.content.upper() == "-OFF" and response_msg.channel == message.channel:
 			config.sched_post_chan_ids.remove(response_msg.channel)
 			await message.delete()
 			await response_msg.delete()
-			await ctx.send("Scheduled messages have been turned off for this channel!")
+			await ctx.send("Scheduled posts have been turned off for this channel!")
 		else:
 			await message.delete()
 			await response_msg.delete()

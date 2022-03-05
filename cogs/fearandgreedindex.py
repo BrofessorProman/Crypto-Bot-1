@@ -1,22 +1,23 @@
 from discord.ext import commands
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
-from requests import Session
-import json
+import json, config
 
 fng_url = "https://api.alternative.me/fng/?limit=10&format=json&date_format=us"
 
-class FngIndex(commands.Cog):
+class FngIndex(commands.Cog, name="Fear and Greed Index"):
 	"""
-	This class handles getting the fear and greed index using an api and commands to show today's fear and greed index
-	as well as yesterday's fear and greed index.
+	Gets the Fear and Greed Index.
 	"""
 
-	def __init__(self, bot):
+	def __init__(self, bot: commands.Bot):
 		self.bot = bot
 
 	# Command for getting the current fear and greed index and print it out
 	@commands.command()
-	async def fng(self, ctx):
+	async def fng(self, ctx: commands.Context):
+		"""
+		Show today's Fear and Greed Index.
+		"""
 		fng_json = await self.get_fngIndex()
 		if isinstance(fng_json, list):
 			fng_index = fng_json[0]
@@ -30,7 +31,10 @@ class FngIndex(commands.Cog):
 
 	# Command for getting yesterday's fear and greed index and print it out
 	@commands.command()
-	async def yfng(self, ctx):
+	async def yfng(self, ctx: commands.Context):
+		"""
+		Show yesterday's Fear and Greed Index.
+		"""
 		fng_json = await self.get_fngIndex()
 		if isinstance(fng_json, list):
 			fng_index = fng_json[1]
@@ -42,7 +46,7 @@ class FngIndex(commands.Cog):
 	# See cogs.scheduledposts for scheduled for scheduled posting
 	async def get_fngIndex(self):
 		try:
-			response = Session().get(fng_url)
+			response = config.session.get(fng_url)
 			json_data = json.loads(response.text)
 			fng_list = json_data["data"]
 			return fng_list
@@ -50,5 +54,5 @@ class FngIndex(commands.Cog):
 			print(e)
 			return
 
-def setup(bot):
+def setup(bot: commands.Bot):
 	bot.add_cog(FngIndex(bot))
